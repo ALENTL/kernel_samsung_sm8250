@@ -39,6 +39,15 @@
 #include <linux/fs_context.h>
 #include "internal.h"
 
+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+#include <linux/susfs_def.h>
+#endif
+
+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+extern bool susfs_is_current_ksu_domain(void);
+extern struct static_key_true susfs_is_sdcard_android_data_not_decrypted;
+#endif
+
 static int thaw_super_locked(struct super_block *sb);
 
 static LIST_HEAD(super_blocks);
@@ -1119,6 +1128,22 @@ int get_anon_bdev(dev_t *p)
 	 * Many userspace utilities consider an FSID of 0 invalid.
 	 * Always return at least 1 from get_anon_bdev.
 	 */
+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+	if (!static_key_enabled(&susfs_is_sdcard_android_data_not_decrypted) &&
+	    susfs_is_current_ksu_domain()) {
+		dev = ida_alloc_range(&unnamed_dev_ida,
+				      DEFAULT_KSU_MNT_MINOR_DEV,
+				      (1 << MINORBITS) - 1,
+				      GFP_ATOMIC);
+		if (dev == -ENOSPC)
+			dev = -EMFILE;
+		if (dev < 0)
+			return dev;
+
+		*p = MKDEV(0, dev);
+		return 0;
+	}
+#endif
 	dev = ida_alloc_range(&unnamed_dev_ida, 1, (1 << MINORBITS) - 1,
 			GFP_ATOMIC);
 	if (dev == -ENOSPC)
