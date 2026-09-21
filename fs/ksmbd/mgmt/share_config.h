@@ -12,7 +12,6 @@
 #include <linux/unicode.h>
 
 struct ksmbd_work;
-
 struct ksmbd_share_config {
 	char			*name;
 	char			*path;
