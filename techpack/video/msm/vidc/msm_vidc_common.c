@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
  */
 
 #include <linux/jiffies.h>
@@ -693,25 +693,6 @@ enum multi_stream msm_comm_get_stream_output_mode(struct msm_vidc_inst *inst)
 		return HAL_VIDEO_DECODER_PRIMARY;
 }
 
-bool vidc_scalar_enabled(struct msm_vidc_inst *inst)
-{
-	struct v4l2_format *f;
-	u32 output_height, output_width, input_height, input_width;
-	bool scalar_enable = false;
-
-	f = &inst->fmts[OUTPUT_PORT].v4l2_fmt;
-	output_height = f->fmt.pix_mp.height;
-	output_width = f->fmt.pix_mp.width;
-	f = &inst->fmts[INPUT_PORT].v4l2_fmt;
-	input_height = f->fmt.pix_mp.height;
-	input_width = f->fmt.pix_mp.width;
-
-	if (output_height != input_height || output_width != input_width)
-		scalar_enable = true;
-
-	return scalar_enable;
-}
-
 bool is_single_session(struct msm_vidc_inst *inst, u32 ignore_flags)
 {
 	bool single = true;
@@ -817,8 +798,8 @@ int msm_comm_get_inst_load(struct msm_vidc_inst *inst,
 	 *                 |          res * max(op, fps)|
 	 * ----------------|----------------------------|
 	 */
-	if (!is_supported_session(inst) ||
-		is_thumbnail_session(inst) ||
+
+	if (is_thumbnail_session(inst) ||
 		(!is_realtime_session(inst) &&
 		 quirks == LOAD_ADMISSION_CONTROL)) {
 		load = 0;
@@ -858,6 +839,7 @@ int msm_comm_get_device_load(struct msm_vidc_core *core,
 	list_for_each_entry(inst, &core->instances, list) {
 		if (inst->session_type != sess_type)
 			continue;
+
 		if (load_type == MSM_VIDC_VIDEO && !is_video_session(inst))
 			continue;
 		else if (load_type == MSM_VIDC_IMAGE && !is_grid_session(inst))
@@ -3103,6 +3085,7 @@ static int msm_comm_init_core(struct msm_vidc_inst *inst)
 	core->state = VIDC_CORE_INIT;
 	core->smmu_fault_handled = false;
 	core->trigger_ssr = false;
+	core->resources.max_inst_count = MAX_SUPPORTED_INSTANCES;
 	core->resources.max_secure_inst_count =
 		core->resources.max_secure_inst_count ?
 		core->resources.max_secure_inst_count :
@@ -3576,7 +3559,6 @@ static int msm_vidc_load_resources(int flipped_state,
 			"H/W is overloaded. needed: %d max: %d\n",
 			video_load, max_video_load);
 		msm_vidc_print_running_insts(inst->core);
-		inst->supported = false;
 		return -ENOMEM;
 	}
 
@@ -3585,7 +3567,6 @@ static int msm_vidc_load_resources(int flipped_state,
 			"H/W is overloaded. needed: [video + image][%d + %d], max: [video + image][%d + %d]\n",
 			video_load, image_load, max_video_load, max_image_load);
 		msm_vidc_print_running_insts(inst->core);
-		inst->supported = false;
 		return -ENOMEM;
 	}
 
@@ -5993,7 +5974,6 @@ static int msm_vidc_check_mbps_supported(struct msm_vidc_inst *inst)
 				"H/W is overloaded. needed: %d max: %d\n",
 				video_load, max_video_load);
 			msm_vidc_print_running_insts(inst->core);
-			inst->supported = false;
 			return -EBUSY;
 		}
 
@@ -6003,7 +5983,6 @@ static int msm_vidc_check_mbps_supported(struct msm_vidc_inst *inst)
 				video_load, image_load,
 				max_video_load, max_image_load);
 			msm_vidc_print_running_insts(inst->core);
-			inst->supported = false;
 			return -EBUSY;
 		}
 	}
@@ -6222,12 +6201,10 @@ int msm_vidc_check_session_supported(struct msm_vidc_inst *inst)
 				width_min, height_min);
 			rc = -ENOTSUPP;
 		}
-		if (!rc && (output_width > width_max ||
-				output_height > height_max)) {
+		if (!rc && output_width > width_max) {
 			s_vpr_e(sid,
-				"Unsupported WxH (%u)x(%u), max supported is (%u)x(%u)\n",
-				output_width, output_height,
-				width_max, height_max);
+				"Unsupported width = %u supported max width = %u\n",
+				output_width, width_max);
 				rc = -ENOTSUPP;
 		}
 
