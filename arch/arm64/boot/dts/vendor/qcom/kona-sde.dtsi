@@ -73,7 +73,6 @@
 		qcom,sde-wb-xin-id = <6>;
 		qcom,sde-wb-id = <2>;
 		qcom,sde-wb-clk-ctrl = <0x2bc 16>;
-		qcom,sde-wb-clk-status = <0x3bc 20>;
 
 		qcom,sde-intf-off = <0x6b000 0x6b800
 					0x6c000 0x6c800>;
@@ -97,7 +96,6 @@
 		qcom,sde-dsc-off = <0x81000 0x81400 0x81800 0x81c00>;
 		qcom,sde-dsc-size = <0x140>;
 		qcom,sde-dsc-pair-mask = <2 1 4 3>;
-		qcom,sde-dsc-linewidth = <2048>;
 
 		qcom,sde-dither-off = <0x30e0 0x30e0 0x30e0
 							0x30e0 0x30e0 0x30e0>;
@@ -305,6 +303,7 @@
 				<1 590 0 150000>,
 				<1 590 0 300000>;
 		};
+
 		qcom,sde-limits {
 			qcom,sde-linewidth-limits {
 				qcom,sde-limit-name = "sspp_linewidth_usecases";
