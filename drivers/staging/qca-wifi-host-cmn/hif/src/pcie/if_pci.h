@@ -284,14 +284,13 @@ static inline int hif_pm_runtime_put_auto(struct device *dev)
 #endif /* FEATURE_RUNTIME_PM */
 
 #ifdef HIF_BUS_LOG_INFO
-bool hif_log_pcie_info(struct hif_softc *scn, uint8_t *data,
+void hif_log_pcie_info(struct hif_softc *scn, uint8_t *data,
 		       unsigned int *offset);
 #else
 static inline
-bool hif_log_pcie_info(struct hif_softc *scn, uint8_t *data,
+void hif_log_pcie_info(struct hif_softc *scn, uint8_t *data,
 		       unsigned int *offset)
 {
-	return false;
 }
 #endif
 #endif /* __ATH_PCI_H__ */

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -399,18 +399,15 @@ hdd_conn_get_connected_cipher_algo(struct hdd_station_ctx *sta_ctx,
 struct hdd_adapter *hdd_get_sta_connection_in_progress(
 			struct hdd_context *hdd_ctx)
 {
-	struct hdd_adapter *adapter = NULL, *next_adapter = NULL;
+	struct hdd_adapter *adapter = NULL;
 	struct hdd_station_ctx *hdd_sta_ctx;
-	wlan_net_dev_ref_dbgid dbgid =
-				NET_DEV_HOLD_GET_STA_CONNECTION_IN_PROGRESS;
 
 	if (!hdd_ctx) {
 		hdd_err("HDD context is NULL");
 		return NULL;
 	}
 
-	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
-					   dbgid) {
+	hdd_for_each_adapter(hdd_ctx, adapter) {
 		hdd_sta_ctx = WLAN_HDD_GET_STATION_CTX_PTR(adapter);
 		if ((QDF_STA_MODE == adapter->device_mode) ||
 		    (QDF_P2P_CLIENT_MODE == adapter->device_mode) ||
@@ -419,10 +416,6 @@ struct hdd_adapter *hdd_get_sta_connection_in_progress(
 			    hdd_sta_ctx->conn_info.conn_state) {
 				hdd_debug("vdev_id %d: Connection is in progress",
 					  adapter->vdev_id);
-				hdd_adapter_dev_put_debug(adapter, dbgid);
-				if (next_adapter)
-					hdd_adapter_dev_put_debug(next_adapter,
-								  dbgid);
 				return adapter;
 			} else if ((eConnectionState_Associated ==
 				   hdd_sta_ctx->conn_info.conn_state) &&
@@ -431,14 +424,9 @@ struct hdd_adapter *hdd_get_sta_connection_in_progress(
 							adapter->vdev_id)) {
 				hdd_debug("vdev_id %d: Key exchange is in progress",
 					  adapter->vdev_id);
-				hdd_adapter_dev_put_debug(adapter, dbgid);
-				if (next_adapter)
-					hdd_adapter_dev_put_debug(next_adapter,
-								  dbgid);
 				return adapter;
 			}
 		}
-		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
 	return NULL;
 }
@@ -1848,37 +1836,6 @@ static void hdd_cm_set_default_wlm_mode(struct hdd_adapter *adapter)
 }
 
 /**
- * hdd_reset_udp_qos_upgrade_config() - Reset the threshold for UDP packet
- * QoS upgrade.
- * @adapter: adapter for which this configuration is to be applied
- *
- * Return: None
- */
-static void hdd_reset_udp_qos_upgrade_config(struct hdd_adapter *adapter)
-{
-	struct hdd_context *hdd_ctx = WLAN_HDD_GET_CTX(adapter);
-	bool reset;
-	QDF_STATUS status;
-
-	if (!hdd_ctx) {
-		hdd_err("hdd_ctx is NULL");
-		return;
-	}
-
-	status = ucfg_mlme_cfg_get_wlm_reset(hdd_ctx->psoc, &reset);
-	if (QDF_IS_STATUS_ERROR(status)) {
-		hdd_err("could not get the wlm reset flag");
-		return;
-	}
-
-	if (reset) {
-		adapter->upgrade_udp_qos_threshold = QCA_WLAN_AC_BK;
-		hdd_debug("UDP packets qos upgrade to: %d",
-			  adapter->upgrade_udp_qos_threshold);
-	}
-}
-
-/**
  * hdd_dis_connect_handler() - disconnect event handler
  * @adapter: pointer to adapter
  * @roam_info: pointer to roam info
@@ -1930,7 +1887,6 @@ static QDF_STATUS hdd_dis_connect_handler(struct hdd_adapter *adapter,
 				  sta_ctx->conn_info.bssid.bytes);
 
 	hdd_cm_set_default_wlm_mode(adapter);
-	hdd_reset_udp_qos_upgrade_config(adapter);
 	hdd_periodic_sta_stats_stop(adapter);
 
 #ifdef FEATURE_WLAN_AUTO_SHUTDOWN
@@ -2036,7 +1992,7 @@ static QDF_STATUS hdd_dis_connect_handler(struct hdd_adapter *adapter,
 	if (adapter->device_mode == QDF_STA_MODE) {
 		vdev = hdd_objmgr_get_vdev(adapter);
 		if (vdev) {
-			wlan_crypto_reset_vdev_params(vdev);
+			wlan_crypto_free_vdev_key(vdev);
 			hdd_objmgr_put_vdev(vdev);
 		}
 	}
@@ -3096,15 +3052,6 @@ static inline void hdd_netif_queue_enable(struct hdd_adapter *adapter)
 	}
 }
 
-static void hdd_save_connect_status(struct hdd_adapter *adapter,
-				    struct csr_roam_info *roam_info)
-{
-	if (!roam_info)
-		return;
-
-	adapter->connect_req_status = roam_info->reasonCode;
-}
-
 /**
  * hdd_association_completion_handler() - association completion handler
  * @adapter: pointer to adapter
@@ -3166,7 +3113,6 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 	sta_ctx->cache_conn_info.signal = sta_ctx->conn_info.signal;
 	sta_ctx->cache_conn_info.noise = sta_ctx->conn_info.noise;
 
-	hdd_save_connect_status(adapter, roam_info);
 	/*
 	 * reset scan reject params if connection is success or we received
 	 * final failure from CSR after trying with all APs.
@@ -3346,9 +3292,6 @@ hdd_association_completion_handler(struct hdd_adapter *adapter,
 					  DOT11F_IE_RSN_MAX_LEN);
 		if (!reqRsnIe)
 			return QDF_STATUS_E_NOMEM;
-
-		if (roam_info->fReassocReq || ft_carrier_on)
-			hdd_nud_indicate_roam(adapter);
 
 		/*
 		 * For reassoc, the station is already registered, all we need
@@ -4116,8 +4059,7 @@ static QDF_STATUS wlan_hdd_set_key_helper(struct hdd_adapter *adapter,
 	if (!vdev)
 		return QDF_STATUS_E_FAILURE;
 	ret = wlan_cfg80211_crypto_add_key(vdev,
-					   WLAN_CRYPTO_KEY_TYPE_UNICAST, 0,
-					   false);
+					   WLAN_CRYPTO_KEY_TYPE_UNICAST, 0);
 	hdd_objmgr_put_vdev(vdev);
 	if (ret != 0) {
 		hdd_err("crypto add key fail, status: %d", ret);

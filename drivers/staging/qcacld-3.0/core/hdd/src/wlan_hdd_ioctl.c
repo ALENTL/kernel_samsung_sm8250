@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2012-2021 The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -38,7 +38,6 @@
 #include "wma.h"
 #include "wlan_hdd_napi.h"
 #include "wlan_mlme_ucfg_api.h"
-#include "target_type.h"
 #ifdef FEATURE_WLAN_ESE
 #include <sme_api.h>
 #include <sir_api.h>
@@ -46,7 +45,6 @@
 #include "hif.h"
 #include "wlan_scan_ucfg_api.h"
 #include "wlan_reg_ucfg_api.h"
-#include "qdf_func_tracker.h"
 
 #if defined(LINUX_QCMBR)
 #define SIOCIOCTLTX99 (SIOCDEVPRIVATE+13)
@@ -2974,145 +2972,6 @@ static int hdd_conc_set_dwell_time(struct hdd_adapter *adapter,
 	return retval;
 }
 
-static int hdd_enable_unit_test_commands(struct hdd_adapter *adapter,
-					 struct hdd_context *hdd_ctx)
-{
-	enum pld_bus_type bus_type = pld_get_bus_type(hdd_ctx->parent_dev);
-	u32 arg[2];
-	QDF_STATUS status;
-
-	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE ||
-	    hdd_get_conparam() == QDF_GLOBAL_MONITOR_MODE)
-		return -EPERM;
-
-	if (adapter->vdev_id >= WLAN_MAX_VDEVS) {
-		hdd_err_rl("Invalid vdev id");
-		return -EINVAL;
-	}
-
-	if (bus_type == PLD_BUS_TYPE_PCIE) {
-		arg[0] = 360;
-		arg[1] = 3;
-
-		status = sme_send_unit_test_cmd(adapter->vdev_id,
-						WLAN_MODULE_TX,
-						2,
-						arg);
-		if (status != QDF_STATUS_SUCCESS)
-			return qdf_status_to_os_return(status);
-
-		arg[0] = 361;
-		arg[1] = 1;
-
-		status = sme_send_unit_test_cmd(adapter->vdev_id,
-						WLAN_MODULE_TX,
-						2,
-						arg);
-		if (status != QDF_STATUS_SUCCESS)
-			return qdf_status_to_os_return(status);
-
-		if (hdd_ctx->target_type == TARGET_TYPE_QCA6390) {
-			arg[0] = 37;
-			arg[1] = 3000;
-
-			status = sme_send_unit_test_cmd(adapter->vdev_id,
-							WLAN_MODULE_RX,
-							2,
-							arg);
-			if (status != QDF_STATUS_SUCCESS)
-				return qdf_status_to_os_return(status);
-		}
-
-		if (hdd_ctx->target_type == TARGET_TYPE_QCA6490) {
-			arg[0] = 39;
-			arg[1] = 3000;
-
-			status = sme_send_unit_test_cmd(adapter->vdev_id,
-							WLAN_MODULE_RX,
-							2,
-							arg);
-			if (status != QDF_STATUS_SUCCESS)
-				return qdf_status_to_os_return(status);
-		}
-	} else if (bus_type == PLD_BUS_TYPE_SNOC) {
-		arg[0] = 7;
-		arg[1] = 1;
-
-		status = sme_send_unit_test_cmd(adapter->vdev_id,
-						0x44,
-						2,
-						arg);
-		if (status != QDF_STATUS_SUCCESS)
-			return qdf_status_to_os_return(status);
-	} else {
-		return -EINVAL;
-	}
-	return 0;
-}
-
-static int hdd_disable_unit_test_commands(struct hdd_adapter *adapter,
-					  struct hdd_context *hdd_ctx)
-{
-	enum pld_bus_type bus_type = pld_get_bus_type(hdd_ctx->parent_dev);
-	u32 arg[2];
-	QDF_STATUS status;
-
-	if (hdd_get_conparam() == QDF_GLOBAL_FTM_MODE ||
-	    hdd_get_conparam() == QDF_GLOBAL_MONITOR_MODE)
-		return -EPERM;
-
-	if (adapter->vdev_id >= WLAN_MAX_VDEVS) {
-		hdd_err_rl("Invalid vdev id");
-		return -EINVAL;
-	}
-
-	if (bus_type == PLD_BUS_TYPE_PCIE) {
-		arg[0] = 360;
-		arg[1] = 0;
-
-		status = sme_send_unit_test_cmd(adapter->vdev_id,
-						WLAN_MODULE_TX,
-						2,
-						arg);
-		if (status != QDF_STATUS_SUCCESS)
-			return qdf_status_to_os_return(status);
-
-		arg[0] = 361;
-		arg[1] = 0;
-
-		status = sme_send_unit_test_cmd(adapter->vdev_id,
-						WLAN_MODULE_TX,
-						2,
-						arg);
-		if (status != QDF_STATUS_SUCCESS)
-			return qdf_status_to_os_return(status);
-
-		arg[0] = 39;
-		arg[1] = 0;
-
-		status = sme_send_unit_test_cmd(adapter->vdev_id,
-						WLAN_MODULE_RX,
-						2,
-						arg);
-		if (status != QDF_STATUS_SUCCESS)
-			return qdf_status_to_os_return(status);
-
-	} else if (bus_type == PLD_BUS_TYPE_SNOC) {
-		arg[0] = 7;
-		arg[1] = 0;
-
-		status = sme_send_unit_test_cmd(adapter->vdev_id,
-						0x44,
-						2,
-						arg);
-		if (status != QDF_STATUS_SUCCESS)
-			return qdf_status_to_os_return(status);
-	} else {
-		return -EINVAL;
-	}
-	return 0;
-}
-
 static void hdd_get_link_status_cb(uint8_t status, void *context)
 {
 	struct osif_request *request;
@@ -3563,7 +3422,6 @@ static int drv_cmd_set_band(struct hdd_adapter *adapter,
 {
 	int err;
 	uint8_t band;
-	uint32_t band_bitmap;
 
 	/*
 	 * Parse the band value passed from userspace. The first 8 bytes
@@ -3575,9 +3433,7 @@ static int drv_cmd_set_band(struct hdd_adapter *adapter,
 		return err;
 	}
 
-	band_bitmap = hdd_reg_legacy_setband_to_reg_wifi_band_bitmap(band);
-
-	return hdd_reg_set_band(adapter->dev, band_bitmap);
+	return hdd_reg_set_band(adapter->dev, band);
 }
 
 static int drv_cmd_set_wmmps(struct hdd_adapter *adapter,
@@ -5578,24 +5434,6 @@ exit:
 	return ret;
 }
 
-static int drv_cmd_tput_debug_mode_enable(struct hdd_adapter *adapter,
-					  struct hdd_context *hdd_ctx,
-					  u8 *command,
-					  u8 command_len,
-					  struct hdd_priv_data *priv_data)
-{
-	return hdd_enable_unit_test_commands(adapter, hdd_ctx);
-}
-
-static int drv_cmd_tput_debug_mode_disable(struct hdd_adapter *adapter,
-					   struct hdd_context *hdd_ctx,
-					   u8 *command,
-					   u8 command_len,
-					   struct hdd_priv_data *priv_data)
-{
-	return hdd_disable_unit_test_commands(adapter, hdd_ctx);
-}
-
 #ifdef FEATURE_WLAN_RMC
 /* Function header is left blank intentionally */
 static int hdd_parse_setrmcenable_command(uint8_t *command,
@@ -6293,8 +6131,6 @@ static int drv_cmd_max_tx_power(struct hdd_adapter *adapter,
 	uint8_t *value = command;
 	struct qdf_mac_addr bssid = QDF_MAC_ADDR_BCAST_INIT;
 	struct qdf_mac_addr selfmac = QDF_MAC_ADDR_BCAST_INIT;
-	struct hdd_adapter *next_adapter = NULL;
-	wlan_net_dev_ref_dbgid dbgid = NET_DEV_HOLD_DRV_CMD_MAX_TX_POWER;
 
 	ret = hdd_parse_setmaxtxpower_command(value, &tx_power);
 	if (ret) {
@@ -6302,8 +6138,7 @@ static int drv_cmd_max_tx_power(struct hdd_adapter *adapter,
 		return ret;
 	}
 
-	hdd_for_each_adapter_dev_held_safe(hdd_ctx, adapter, next_adapter,
-					   dbgid) {
+	hdd_for_each_adapter(hdd_ctx, adapter) {
 		/* Assign correct self MAC address */
 		qdf_copy_macaddr(&bssid,
 				 &adapter->mac_addr);
@@ -6321,14 +6156,9 @@ static int drv_cmd_max_tx_power(struct hdd_adapter *adapter,
 		if (QDF_STATUS_SUCCESS != status) {
 			hdd_err("Set max tx power failed");
 			ret = -EINVAL;
-			hdd_adapter_dev_put_debug(adapter, dbgid);
-			if (next_adapter)
-				hdd_adapter_dev_put_debug(next_adapter,
-							  dbgid);
 			goto exit;
 		}
 		hdd_debug("Set max tx power success");
-		hdd_adapter_dev_put_debug(adapter, dbgid);
 	}
 
 exit:
@@ -7652,7 +7482,7 @@ static int hdd_parse_disable_chan_cmd(struct hdd_adapter *adapter, uint8_t *ptr)
 		 * Restore and Free the cache channels when the command is
 		 * received with num channels as 0
 		 */
-		wlan_hdd_restore_channels(hdd_ctx);
+		wlan_hdd_restore_channels(hdd_ctx, false);
 		return 0;
 	}
 
@@ -7875,6 +7705,255 @@ static int drv_cmd_get_disable_chan_list(struct hdd_adapter *adapter,
 }
 #endif
 
+#ifdef SEC_CONFIG_POWER_BACKOFF
+
+#define WLAN_HDD_UI_SET_GRIP_TX_PWR_VALUE_OFFSET 21
+int cur_sec_sar_index = 0;
+
+#ifdef SEC_CONFIG_WLAN_BEACON_CHECK
+static int hdd_set_bmiss_count_check(struct hdd_adapter *adapter,
+			      struct hdd_context *hdd_ctx, bool enable) {
+	uint8_t ret_val;
+	mac_handle_t mac_handle = hdd_ctx->mac_handle;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+
+	if (enable) {
+		// set bmiss first / final to 30
+		// set kickout count to 2048
+		hdd_err("hdd_set_bmiss_count_check enabled");
+		hdd_debug("Bmiss first cnt(10), Bmiss final cnt(50)");
+		ret_val = sme_set_roam_bmiss_final_bcnt(mac_handle,
+			0, 50);
+
+
+		if (ret_val) {
+			hdd_err("Failed to set bmiss final Bcnt");
+			return ret_val;
+		}
+
+		ret_val = sme_set_bmiss_bcnt(adapter->vdev_id, 10, 50);
+		if (ret_val) {
+			hdd_err("Failed to set bmiss Bcnt");
+			return ret_val;
+		}
+
+		hdd_debug("tx fail count 2048");
+		ret_val = sme_update_tx_fail_cnt_threshold(mac_handle,
+							   adapter->vdev_id, 2048);
+		if (ret_val) {
+			hdd_err("Failed to set kickout count");
+			return ret_val;
+		}
+	} else {
+		// set to default value.
+		hdd_err("hdd_set_bmiss_count_check default");
+		hdd_debug("Bmiss first cnt(%d), Bmiss final cnt(%d)",
+			mac->mlme_cfg->lfr.roam_bmiss_first_bcnt,
+			mac->mlme_cfg->lfr.roam_bmiss_final_bcnt);
+		ret_val = sme_set_roam_bmiss_final_bcnt(mac_handle,
+			0, mac->mlme_cfg->lfr.roam_bmiss_final_bcnt);
+		if (ret_val) {
+			hdd_err("Failed to set bmiss final Bcnt");
+			return ret_val;
+		}
+
+		ret_val = sme_set_bmiss_bcnt(adapter->vdev_id,
+			mac->mlme_cfg->lfr.roam_bmiss_first_bcnt,
+			mac->mlme_cfg->lfr.roam_bmiss_final_bcnt);
+		if (ret_val) {
+			hdd_err("Failed to set bmiss Bcnt");
+			return ret_val;
+		}
+
+		hdd_debug("tx fail count to %d",
+			  mac->mlme_cfg->gen.dropped_pkt_disconnect_thresh);
+		ret_val = sme_update_tx_fail_cnt_threshold(mac_handle,
+				   adapter->vdev_id,
+				   mac->mlme_cfg->gen.dropped_pkt_disconnect_thresh);
+		if (ret_val) {
+			hdd_err("Failed to set kickout count");
+			return ret_val;
+		}
+	}
+	return ret_val;
+}
+
+void hdd_skip_bmiss_set_timer_handler(void *data)
+{
+	struct hdd_context *hdd_ctx = data;
+	struct hdd_adapter *adapter = NULL;
+
+	hdd_debug("Skip Bmiss set timer expired");
+
+	adapter = hdd_get_adapter(hdd_ctx, QDF_STA_MODE);
+	if (!adapter) {
+		hdd_err("No adapter for STA mode");
+		return;
+	}
+
+	hdd_set_bmiss_count_check(adapter, hdd_ctx, hdd_ctx->bmiss_set_last);
+	return;
+}
+#endif
+
+int hdd_set_sar_power_limit(struct hdd_context *hdd_ctx, int8_t index)
+{
+	int status = 0;
+	struct sar_limit_cmd_params sar_limit_cmd = {0};
+	mac_handle_t mac_handle;
+
+	/* Vendor command manadates all SAR Specs in single call */
+	sar_limit_cmd.commit_limits = 1;
+	sar_limit_cmd.num_limit_rows = 0;
+
+	switch (index) {
+		case HEAD_SAR_BACKOFF_ENABLED:
+			sar_limit_cmd.sar_enable = WMI_SAR_FEATURE_ON_SET_0;
+			break;
+		case BODY_SAR_BACKOFF_ENABLED:
+			sar_limit_cmd.sar_enable = WMI_SAR_FEATURE_ON_SET_2;
+			break;
+		case NR_MMWAVE_SAR_BACKOFF_ENABLED:
+			sar_limit_cmd.sar_enable = WMI_SAR_FEATURE_ON_SET_4;
+			break;
+		case HEAD_SAR_BACKOFF_DISABLED:
+		case BODY_SAR_BACKOFF_DISABLED:
+		case NR_MMWAVE_SAR_BACKOFF_DISABLED:
+		case SAR_BACKOFF_DISABLE_ALL:
+			sar_limit_cmd.sar_enable = WMI_SAR_FEATURE_OFF;
+			break;
+		default:
+			hdd_warn("Invalid index %d - Set to diable back off", index);
+			sar_limit_cmd.sar_enable = WMI_SAR_FEATURE_OFF;
+			break;
+	}
+
+	cur_sec_sar_index = index;
+	hdd_info("cur_sec_sar_index = %d, sar_enable = %d",cur_sec_sar_index ,sar_limit_cmd.sar_enable);
+
+	mac_handle = hdd_ctx->mac_handle;
+	status = sme_set_sar_power_limits(mac_handle, &sar_limit_cmd);
+	if (status < 0)
+		hdd_err("Failed to sme_set_sar_power_limits status %d", status);
+
+	return status;
+}
+
+static int drv_cmd_grip_power_set_tx_power_calling(struct hdd_adapter *adapter,
+			 struct hdd_context *hdd_ctx,
+			 uint8_t *command,
+			 uint8_t command_len,
+			 struct hdd_priv_data *priv_data)
+{
+	int status = 0;
+	int8_t set_value;
+	mac_handle_t mac_handle = hdd_ctx->mac_handle;
+	struct mac_context *mac = MAC_CONTEXT(mac_handle);
+
+	hdd_info("command %s UL %d, TL %d", command, priv_data->used_len,
+		 priv_data->total_len);
+
+	/* convert the value from ascii to integer */
+	set_value = command[WLAN_HDD_UI_SET_GRIP_TX_PWR_VALUE_OFFSET] - '0';
+	if (set_value < 0)
+		set_value = -1;
+
+	//HEAD_SAR_BACKOFF_ENABLED
+	//If NR_MMWAVE_SAR_BACKOFF_ENABLED was enabled, set MMW_HEAD_SAR_BACKOFF_ENABLED
+	if (set_value == HEAD_SAR_BACKOFF_ENABLED) {
+		if (cur_sec_sar_index == NR_MMWAVE_SAR_BACKOFF_ENABLED || cur_sec_sar_index == MMW_HEAD_SAR_BACKOFF_ENABLED) {
+			cur_sec_sar_index = MMW_HEAD_SAR_BACKOFF_ENABLED;
+			hdd_info("Ignored - cur_sec_sar_index is [NR_MMWAVE_SAR_BACKOFF_ENABLED]");
+			return -EBUSY;
+		}
+		hdd_set_sar_power_limit(hdd_ctx, set_value);
+#ifdef SEC_CONFIG_WLAN_BEACON_CHECK
+		hdd_ctx->bmiss_set_last = TRUE;
+#endif /* SEC_CONFIG_WLAN_BEACON_CHECK */
+	//BODY_SAR_BACKOFF_ENABLED
+	//If NR_MMWAVE_SAR_BACKOFF_ENABLED was enabled, set MMW_BODY_SAR_BACKOFF_ENABLED
+	} else if (set_value == BODY_SAR_BACKOFF_ENABLED) {
+		if (cur_sec_sar_index == NR_MMWAVE_SAR_BACKOFF_ENABLED || cur_sec_sar_index == MMW_BODY_SAR_BACKOFF_ENABLED) {
+			cur_sec_sar_index = MMW_BODY_SAR_BACKOFF_ENABLED;
+			hdd_info("Ignored - cur_sec_sar_index is [NR_MMWAVE_SAR_BACKOFF_ENABLED]");
+			return -EBUSY;
+		}
+		hdd_set_sar_power_limit(hdd_ctx, set_value);
+#ifdef SEC_CONFIG_WLAN_BEACON_CHECK
+		hdd_ctx->bmiss_set_last = TRUE;
+#endif /* SEC_CONFIG_WLAN_BEACON_CHECK */
+	//NR_MMWAVE_SAR_BACKOFF_ENABLED
+	} else if (set_value == NR_MMWAVE_SAR_BACKOFF_ENABLED) {
+		hdd_set_sar_power_limit(hdd_ctx, set_value);
+#ifdef SEC_CONFIG_WLAN_BEACON_CHECK
+		hdd_ctx->bmiss_set_last = TRUE;
+#endif /* SEC_CONFIG_WLAN_BEACON_CHECK */
+	//HEAD_SAR_BACKOFF_DISABLED
+	//If NR_MMWAVE_SAR_BACKOFF_ENABLED was enabled, set NR_MMWAVE_SAR_BACKOFF_ENABLED again
+	} else if (set_value == HEAD_SAR_BACKOFF_DISABLED ) {
+		if (cur_sec_sar_index == NR_MMWAVE_SAR_BACKOFF_ENABLED || cur_sec_sar_index == MMW_HEAD_SAR_BACKOFF_ENABLED) {
+			cur_sec_sar_index = NR_MMWAVE_SAR_BACKOFF_ENABLED;
+			hdd_info("Ignored - NR_MMWAVE_SAR_BACKOFF_DISABLED only can disable mmW back off");
+			return -EBUSY;
+		}
+		hdd_set_sar_power_limit(hdd_ctx, set_value);
+#ifdef SEC_CONFIG_WLAN_BEACON_CHECK
+		hdd_ctx->bmiss_set_last = FALSE;
+#endif /* SEC_CONFIG_WLAN_BEACON_CHECK */
+	//BODY_SAR_BACKOFF_DISABLED
+	//If NR_MMWAVE_SAR_BACKOFF_ENABLED was enabled, set NR_MMWAVE_SAR_BACKOFF_ENABLED again
+	} else if (set_value == BODY_SAR_BACKOFF_DISABLED) {
+		if (cur_sec_sar_index == NR_MMWAVE_SAR_BACKOFF_ENABLED || cur_sec_sar_index == MMW_BODY_SAR_BACKOFF_ENABLED) {
+			cur_sec_sar_index = NR_MMWAVE_SAR_BACKOFF_ENABLED;
+			hdd_info("Ignored - NR_MMWAVE_SAR_BACKOFF_DISABLED only can disable mmW back off");
+			return -EBUSY;
+		}
+		hdd_set_sar_power_limit(hdd_ctx, set_value);
+#ifdef SEC_CONFIG_WLAN_BEACON_CHECK
+		hdd_ctx->bmiss_set_last = FALSE;
+#endif /* SEC_CONFIG_WLAN_BEACON_CHECK */
+	//NR_MMWAVE_SAR_BACKOFF_DISABLED
+	//If MMW_HEAD_SAR_BACKOFF_ENABLED or MMW_BODY_SAR_BACKOFF_ENABLED
+	//will be set MMW_HEAD_SAR_BACKOFF_ENABLED or MMW_BODY_SAR_BACKOFF_ENABLED
+	} else if (set_value == NR_MMWAVE_SAR_BACKOFF_DISABLED) {
+		if (cur_sec_sar_index == MMW_HEAD_SAR_BACKOFF_ENABLED) {
+			set_value = HEAD_SAR_BACKOFF_ENABLED;
+		} else if (cur_sec_sar_index == MMW_BODY_SAR_BACKOFF_ENABLED) {
+			set_value = BODY_SAR_BACKOFF_ENABLED;
+		}
+		hdd_set_sar_power_limit(hdd_ctx, set_value);
+#ifdef SEC_CONFIG_WLAN_BEACON_CHECK
+		if(set_value == NR_MMWAVE_SAR_BACKOFF_DISABLED)
+			hdd_ctx->bmiss_set_last = FALSE;
+		else
+			hdd_ctx->bmiss_set_last = TRUE;
+#endif /* SEC_CONFIG_WLAN_BEACON_CHECK */
+	} else {
+		hdd_set_sar_power_limit(hdd_ctx, SAR_BACKOFF_DISABLE_ALL);
+#ifdef SEC_CONFIG_WLAN_BEACON_CHECK
+		hdd_ctx->bmiss_set_last = FALSE;
+#endif /* SEC_CONFIG_WLAN_BEACON_CHECK */
+	}
+
+#ifdef SEC_CONFIG_WLAN_BEACON_CHECK
+	if(hdd_ctx->bmiss_set_last) {
+		if (QDF_TIMER_STATE_RUNNING != qdf_mc_timer_get_current_state(&hdd_ctx->skip_bmiss_set_timer)) {
+			hdd_set_bmiss_count_check(adapter, hdd_ctx, TRUE);
+			qdf_mc_timer_start(&hdd_ctx->skip_bmiss_set_timer, (10+50)*100); /* 6 sec */
+		}
+	} else {
+		if (QDF_TIMER_STATE_RUNNING != qdf_mc_timer_get_current_state(&hdd_ctx->skip_bmiss_set_timer)) {
+			hdd_set_bmiss_count_check(adapter, hdd_ctx, FALSE);
+			qdf_mc_timer_start(&hdd_ctx->skip_bmiss_set_timer,
+					   (mac->mlme_cfg->lfr.roam_bmiss_first_bcnt + mac->mlme_cfg->lfr.roam_bmiss_final_bcnt)*100);
+		}
+	}
+#endif /* SEC_CONFIG_WLAN_BEACON_CHECK */
+
+	return status;
+}
+#endif /* SEC_CONFIG_POWER_BACKOFF */
+
 #ifdef FEATURE_ANI_LEVEL_REQUEST
 static int drv_cmd_get_ani_level(struct hdd_adapter *adapter,
 				 struct hdd_context *hdd_ctx,
@@ -8043,69 +8122,6 @@ static int drv_cmd_get_ani_level(struct hdd_adapter *adapter,
 	return 0;
 }
 #endif
-
-#ifdef FUNC_CALL_MAP
-static int drv_cmd_get_function_call_map(struct hdd_adapter *adapter,
-					 struct hdd_context *hdd_ctx,
-					 uint8_t *command,
-					 uint8_t command_len,
-					 struct hdd_priv_data *priv_data)
-{
-	char *cc_buf = qdf_mem_malloc(QDF_FUNCTION_CALL_MAP_BUF_LEN);
-	uint8_t *param;
-	int temp_int;
-
-	param = strnchr(command, strlen(command), ' ');
-	/*no argument after the command*/
-	if (NULL == param)
-		return -EINVAL;
-
-	/*no space after the command*/
-	else if (SPACE_ASCII_VALUE != *param)
-		return -EINVAL;
-
-	param++;
-
-	/*removing empty spaces*/
-	while ((SPACE_ASCII_VALUE  == *param) && ('\0' !=  *param))
-		param++;
-
-	/*no argument followed by spaces*/
-	if ('\0' == *param)
-		return -EINVAL;
-
-	/*getting the first argument */
-	if (sscanf(param, "%d ", &temp_int) != 1) {
-		hdd_err("No option given");
-		return -EINVAL;
-	}
-
-	if (temp_int < 0 || temp_int > 1) {
-		hdd_err("Invalid option given");
-		return -EINVAL;
-	}
-
-	/* Read the buffer */
-	if (temp_int) {
-	/*
-	 * These logs are required as these indicates the start and end of the
-	 * dump for the auto script to parse
-	 */
-		hdd_info("Function call map dump start");
-		qdf_get_func_call_map(cc_buf);
-		qdf_trace_hex_dump(QDF_MODULE_ID_HDD, QDF_TRACE_LEVEL_DEBUG,
-				   cc_buf, QDF_FUNCTION_CALL_MAP_BUF_LEN);
-		hdd_info("Function call map dump end");
-	} else {
-		qdf_clear_func_call_map();
-		hdd_info("Function call map clear");
-	}
-	qdf_mem_free(cc_buf);
-
-	return 0;
-}
-#endif
-
 /*
  * The following table contains all supported WLAN HDD
  * IOCTL driver commands and the handler for each of them.
@@ -8177,8 +8193,6 @@ static const struct hdd_drv_cmd hdd_drv_cmds[] = {
 	{"GETDWELLTIME",              drv_cmd_get_dwell_time, false},
 	{"SETDWELLTIME",              drv_cmd_set_dwell_time, true},
 	{"MIRACAST",                  drv_cmd_miracast, true},
-	{"TPUT_DEBUG_MODE_ENABLE",    drv_cmd_tput_debug_mode_enable, false},
-	{"TPUT_DEBUG_MODE_DISABLE",   drv_cmd_tput_debug_mode_disable, false},
 	{"SETIBSSBEACONOUIDATA",      drv_cmd_set_ibss_beacon_oui_data, true},
 #ifdef FEATURE_WLAN_RMC
 	{"SETRMCENABLE",              drv_cmd_set_rmc_enable, true},
@@ -8231,10 +8245,10 @@ static const struct hdd_drv_cmd hdd_drv_cmds[] = {
 	{"SET_DISABLE_CHANNEL_LIST",  drv_cmd_set_disable_chan_list, true},
 	{"GET_DISABLE_CHANNEL_LIST",  drv_cmd_get_disable_chan_list, false},
 #endif /* CONFIG_SEC */
+#ifdef SEC_CONFIG_POWER_BACKOFF
+	{"SET_TX_POWER_CALLING",      drv_cmd_grip_power_set_tx_power_calling},
+#endif /* SEC_CONFIG_POWER_BACKOFF */
 	{"GET_ANI_LEVEL",             drv_cmd_get_ani_level, false},
-#ifdef FUNC_CALL_MAP
-	{"GET_FUNCTION_CALL_MAP",     drv_cmd_get_function_call_map, true},
-#endif
 	{"STOP",                      drv_cmd_dummy, false},
 	/* Deprecated commands */
 	{"RXFILTER-START",            drv_cmd_dummy, false},

@@ -2477,8 +2477,7 @@ static int wma_wake_event_packet(
 		 * dump event buffer which contains more info regarding
 		 * current page fault.
 		 */
-		wma_debug("PAGE_FAULT occurs during suspend: packet_len %u",
-			  packet_len);
+		WMA_LOGD("PAGE_FAULT occurs during suspend:");
 		qdf_trace_hex_dump(QDF_MODULE_ID_WMA, QDF_TRACE_LEVEL_DEBUG,
 				   packet, packet_len);
 		break;
@@ -4191,9 +4190,6 @@ QDF_STATUS wma_send_apf_enable_cmd(WMA_HANDLE handle, uint8_t vdev_id,
 		return QDF_STATUS_E_INVAL;
 	}
 
-	if (!wma_is_vdev_valid(vdev_id))
-		return QDF_STATUS_E_INVAL;
-
 	if (!WMI_SERVICE_IS_ENABLED(wma->wmi_service_bitmap,
 		WMI_SERVICE_BPF_OFFLOAD)) {
 		WMA_LOGE(FL("APF cababilities feature bit not enabled"));
@@ -4880,8 +4876,8 @@ int wma_unified_power_debug_stats_event_handler(void *handle,
 
 	param_buf = (wmi_pdev_chip_power_stats_event_fixed_param *)
 		param_tlvs->fixed_param;
-	if (!mac) {
-		wma_debug("NULL mac ptr");
+	if (!mac || !mac->sme.power_stats_resp_callback) {
+		WMA_LOGD("%s: NULL mac ptr or HDD callback is null", __func__);
 		return -EINVAL;
 	}
 
@@ -4933,10 +4929,8 @@ int wma_unified_power_debug_stats_event_handler(void *handle,
 	qdf_mem_copy(power_stats_results->debug_registers,
 			debug_registers, stats_registers_len);
 
-	if (mac->sme.sme_power_debug_stats_callback)
-		mac->sme.sme_power_debug_stats_callback(mac,
-							power_stats_results);
-
+	mac->sme.power_stats_resp_callback(power_stats_results,
+			mac->sme.power_debug_stats_context);
 	qdf_mem_free(power_stats_results);
 	return 0;
 }

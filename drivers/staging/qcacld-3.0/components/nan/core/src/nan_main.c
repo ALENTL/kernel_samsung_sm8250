@@ -540,7 +540,7 @@ static QDF_STATUS nan_handle_confirm(
 		nan_err("psoc is null");
 		return QDF_STATUS_E_NULL_VALUE;
 	}
-
+	
 	peer = wlan_objmgr_get_peer_by_mac(psoc,
 					   confirm->peer_ndi_mac_addr.bytes,
 					   WLAN_NAN_ID);

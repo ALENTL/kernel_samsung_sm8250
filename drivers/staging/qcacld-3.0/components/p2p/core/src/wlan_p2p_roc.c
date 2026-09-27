@@ -144,7 +144,7 @@ static QDF_STATUS p2p_scan_start(struct p2p_roc_context *roc_ctx)
 		/* this is to protect too huge value if some customers
 		 * give a higher value from supplicant
 		 */
-
+		
 		if (go_num && req->scan_req.dwell_time_passive >
 			P2P_MAX_ROC_DURATION_GO_PRESENT) {
 				req->scan_req.dwell_time_passive =
@@ -168,9 +168,8 @@ static QDF_STATUS p2p_scan_start(struct p2p_roc_context *roc_ctx)
 					req->scan_req.dwell_time_passive =
 						P2P_MAX_ROC_DURATION_NON_DBS_NAN_PRESENT;
 		} else if (req->scan_req.dwell_time_passive >
-			P2P_MAX_ROC_DURATION) {
+			P2P_MAX_ROC_DURATION)
 			req->scan_req.dwell_time_passive = P2P_MAX_ROC_DURATION;
-		}
 	}
 	p2p_debug("FW requested roc duration is:%d",
 		  req->scan_req.dwell_time_passive);

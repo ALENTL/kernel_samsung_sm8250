@@ -1,6 +1,6 @@
 /*
  * Copyright (c) 2012-2020 The Linux Foundation. All rights reserved.
- * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved.
+ * Copyright (c) 2022-2023 Qualcomm Innovation Center, Inc. All rights reserved
  *
  * Permission to use, copy, modify, and/or distribute this software for
  * any purpose with or without fee is hereby granted, provided that the
@@ -1354,6 +1354,9 @@ struct policy_mgr_sme_cbacks {
  * @get_mode_for_non_connected_vdev: Get the mode for a non
  *                                 connected vdev
  * @hdd_get_device_mode: Get QDF_OPMODE type for session id (vdev id)
+ * @hdd_wapi_security_sta_exist: Get whether wapi encription station existing
+ * or not. Some hw doesn't support WAPI encryption concurrency with other
+ * encryption type.
  * @hdd_is_chan_switch_in_progress: Check if in any adater channel switch is in
  * progress
  * @wlan_hdd_set_sap_csa_reason: Set the sap csa reason in cases like NAN.
@@ -1372,6 +1375,7 @@ struct policy_mgr_hdd_cbacks {
 				struct wlan_objmgr_psoc *psoc,
 				uint8_t vdev_id);
 	enum QDF_OPMODE (*hdd_get_device_mode)(uint32_t session_id);
+	bool (*hdd_wapi_security_sta_exist)(void);
 	bool (*hdd_is_chan_switch_in_progress)(void);
 	bool (*hdd_is_cac_in_progress)(void);
 	void (*wlan_hdd_set_sap_csa_reason)(struct wlan_objmgr_psoc *psoc,
@@ -1530,6 +1534,7 @@ void policy_mgr_set_dual_mac_fw_mode_config(struct wlan_objmgr_psoc *psoc,
 
 /**
  * policy_mgr_soc_set_dual_mac_cfg_cb() - Callback for set dual mac config
+ * @psoc: PSOC object information
  * @status: Status of set dual mac config
  * @scan_config: Current scan config whose status is the first param
  * @fw_mode_config: Current FW mode config whose status is the first param
@@ -1538,8 +1543,10 @@ void policy_mgr_set_dual_mac_fw_mode_config(struct wlan_objmgr_psoc *psoc,
  *
  * Return: None
  */
-void policy_mgr_soc_set_dual_mac_cfg_cb(enum set_hw_mode_status status,
-		uint32_t scan_config, uint32_t fw_mode_config);
+void policy_mgr_soc_set_dual_mac_cfg_cb(struct wlan_objmgr_psoc *psoc,
+					enum set_hw_mode_status status,
+					uint32_t scan_config,
+					uint32_t fw_mode_config);
 
 /**
  * policy_mgr_map_concurrency_mode() - to map concurrency mode
@@ -1704,6 +1711,44 @@ QDF_STATUS policy_mgr_reset_connection_update(struct wlan_objmgr_psoc *psoc);
  * Return: QDF_STATUS
  */
 QDF_STATUS policy_mgr_set_connection_update(struct wlan_objmgr_psoc *psoc);
+
+/**
+ * policy_mgr_reset_dual_mac_configuration() - Reset dual MAC configuration
+ * complete event
+ * @psoc: PSOC object information
+ * Resets the concurrent dual MAC configuration complete event
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+policy_mgr_reset_dual_mac_configuration(struct wlan_objmgr_psoc *psoc);
+
+
+/**
+ * policy_mgr_wait_for_dual_mac_configuration() - Wait for set dual MAC
+ * configuration command to get processed
+ * @psoc: PSOC object information
+ * Waits for DUAL_MAC_CONFIG_TIMEOUT duration until
+ * policy_mgr_soc_set_dual_mac_cfg_cb sets the event
+ * dual_mac_configuration_complete_evt
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+policy_mgr_wait_for_dual_mac_configuration(struct wlan_objmgr_psoc *psoc);
+
+
+/**
+ * policy_mgr_dual_mac_configuration_complete() - Complete dual MAC
+ * configuration wait event
+ * @psoc: PSOC object information
+ * Sets the concurrent dual MAC configuration complete event
+ *
+ * Return: QDF_STATUS
+ */
+QDF_STATUS
+policy_mgr_dual_mac_configuration_complete(struct wlan_objmgr_psoc *psoc);
+
 
 /**
  * policy_mgr_set_chan_switch_complete_evt() - set channel
@@ -2762,10 +2807,9 @@ QDF_STATUS policy_mgr_get_updated_scan_and_fw_mode_config(
  * Return: true if session is on DFS or false if session is on non-dfs channel
  */
 bool policy_mgr_is_sta_present_on_dfs_channel(struct wlan_objmgr_psoc *psoc,
-					      uint8_t *vdev_id,
-					      qdf_freq_t *ch_freq,
-					      enum hw_mode_bandwidth *ch_width);
-
+                         uint8_t *vdev_id,
+                         qdf_freq_t *ch_freq,
+                         enum hw_mode_bandwidth *ch_width);
 /**
  * policy_mgr_is_safe_channel - Check if the channel is in LTE
  * coex channel avoidance list
@@ -2983,7 +3027,7 @@ bool policy_mgr_is_sta_connected_2g(struct wlan_objmgr_psoc *psoc);
  * Return: true if sta is connected in 5 GHz else false
  */
 bool policy_mgr_is_connected_sta_5g(struct wlan_objmgr_psoc *psoc,
-				    qdf_freq_t *freq);
+                   qdf_freq_t *freq);
 
 /**
  * policy_mgr_scan_trim_5g_chnls_for_dfs_ap() - check if sta scan should skip
