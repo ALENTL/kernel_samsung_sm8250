@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -262,6 +262,7 @@ struct msm_vidc_core {
 	u32 dec_codec_supported;
 	u32 codec_count;
 	struct msm_vidc_capability *capabilities;
+	struct delayed_work fw_unload_work;
 	bool smmu_fault_handled;
 };
 
@@ -333,7 +334,7 @@ struct msm_vidc_ctrl {
 	const char * const *qmenu;
 };
 
-void handle_cmd_response(u32 cmd, void *data);
+void handle_cmd_response(enum hal_command_response cmd, void *data);
 int msm_vidc_trigger_ssr(struct msm_vidc_core *core,
 	enum hal_ssr_trigger_type type);
 int msm_vidc_check_session_supported(struct msm_vidc_inst *inst);
@@ -413,6 +414,7 @@ struct msm_smem *msm_smem_user_to_kernel(struct msm_vidc_inst *inst,
 		int fd, u32 offset,
 		u32 size, enum hal_buffer buffer_type);
 
+void msm_vidc_fw_unload_handler(struct work_struct *work);
 /* XXX: normally should be in msm_vidc.h, but that's meant for public APIs,
  * whereas this is private
  */

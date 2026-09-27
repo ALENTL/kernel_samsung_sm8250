@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
- * Copyright (c) 2012-2021, The Linux Foundation. All rights reserved.
+ * Copyright (c) 2012-2020, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -1434,7 +1434,6 @@ struct msm_vidc_gov_data {
 	struct vidc_bus_vote_data *data;
 	u32 data_count;
 	int imem_size;
-	unsigned long total_bw_ddr;
 };
 
 enum msm_vidc_power_mode {
@@ -1535,7 +1534,8 @@ struct hfi_device {
 	enum hal_default_properties (*get_default_properties)(void *dev);
 };
 
-typedef void (*hfi_cmd_response_callback) (u32 cmd, void *data);
+typedef void (*hfi_cmd_response_callback) (enum hal_command_response cmd,
+			void *data);
 typedef void (*msm_vidc_callback) (u32 response, void *callback);
 
 struct hfi_device *vidc_hfi_initialize(enum msm_vidc_hfi_type hfi_type,

@@ -77,10 +77,9 @@ static enum cvp_status hfi_map_err_status(u32 hfi_err)
 }
 
 static int hfi_process_sys_error(u32 device_id,
-	void *_pkt,
+	struct cvp_hfi_msg_event_notify_packet *pkt,
 	struct msm_cvp_cb_info *info)
 {
-	struct cvp_hfi_msg_event_notify_packet *pkt = _pkt;
 	struct msm_cvp_cb_cmd_done cmd_done = {0};
 
 	cmd_done.device_id = device_id;
@@ -93,10 +92,9 @@ static int hfi_process_sys_error(u32 device_id,
 }
 
 static int hfi_process_session_error(u32 device_id,
-		void *_pkt,
+		struct cvp_hfi_msg_event_notify_packet *pkt,
 		struct msm_cvp_cb_info *info)
 {
-	struct cvp_hfi_msg_event_notify_packet *pkt = _pkt;
 	struct msm_cvp_cb_cmd_done cmd_done = {0};
 
 	cmd_done.device_id = device_id;
@@ -124,10 +122,9 @@ static int hfi_process_session_error(u32 device_id,
 }
 
 static int hfi_process_event_notify(u32 device_id,
-		void *_pkt,
+		struct cvp_hfi_msg_event_notify_packet *pkt,
 		struct msm_cvp_cb_info *info)
 {
-	struct cvp_hfi_msg_event_notify_packet *pkt = _pkt;
 	dprintk(CVP_DBG, "Received: EVENT_NOTIFY\n");
 
 	if (pkt->size < sizeof(struct cvp_hfi_msg_event_notify_packet)) {
@@ -156,10 +153,9 @@ static int hfi_process_event_notify(u32 device_id,
 }
 
 static int hfi_process_sys_init_done(u32 device_id,
-		void *_pkt,
+		struct cvp_hfi_msg_sys_init_done_packet *pkt,
 		struct msm_cvp_cb_info *info)
 {
-	struct cvp_hfi_msg_sys_init_done_packet *pkt = _pkt;
 	struct msm_cvp_cb_cmd_done cmd_done = {0};
 	enum cvp_status status = CVP_ERR_NONE;
 
@@ -234,10 +230,9 @@ enum cvp_status cvp_hfi_process_sys_init_done_prop_read(
 }
 
 static int hfi_process_session_init_done(u32 device_id,
-		void *_pkt,
+		struct cvp_hfi_msg_sys_session_init_done_packet *pkt,
 		struct msm_cvp_cb_info *info)
 {
-	struct cvp_hfi_msg_sys_session_init_done_packet *pkt = _pkt;
 	struct msm_cvp_cb_cmd_done cmd_done = {0};
 	struct cvp_hal_session_init_done session_init_done = { {0} };
 
@@ -262,10 +257,9 @@ static int hfi_process_session_init_done(u32 device_id,
 	return 0;
 }
 static int hfi_process_session_end_done(u32 device_id,
-		void *_pkt,
+		struct cvp_hfi_msg_sys_session_end_done_packet *pkt,
 		struct msm_cvp_cb_info *info)
 {
-	struct cvp_hfi_msg_sys_session_end_done_packet *pkt = _pkt;
 	struct msm_cvp_cb_cmd_done cmd_done = {0};
 
 	dprintk(CVP_DBG, "RECEIVED: SESSION_END_DONE[%#x]\n", pkt->session_id);
@@ -288,10 +282,9 @@ static int hfi_process_session_end_done(u32 device_id,
 }
 
 static int hfi_process_session_abort_done(u32 device_id,
-	void *_pkt,
+	struct cvp_hfi_msg_sys_session_abort_done_packet *pkt,
 	struct msm_cvp_cb_info *info)
 {
-	struct cvp_hfi_msg_sys_session_abort_done_packet *pkt = _pkt;
 	struct msm_cvp_cb_cmd_done cmd_done = {0};
 
 	dprintk(CVP_DBG, "RECEIVED: SESSION_ABORT_DONE[%#x]\n",
@@ -315,10 +308,9 @@ static int hfi_process_session_abort_done(u32 device_id,
 }
 
 static int hfi_process_session_set_buf_done(u32 device_id,
-		void *_pkt,
+		struct cvp_hfi_msg_session_hdr *pkt,
 		struct msm_cvp_cb_info *info)
 {
-	struct cvp_hfi_msg_session_hdr *pkt = _pkt;
 	struct msm_cvp_cb_cmd_done cmd_done = {0};
 	unsigned int pkt_size = get_msg_size();
 
@@ -343,10 +335,9 @@ static int hfi_process_session_set_buf_done(u32 device_id,
 
 
 static int hfi_process_session_rel_buf_done(u32 device_id,
-		void *_pkt,
+		struct cvp_hfi_msg_session_hdr *pkt,
 		struct msm_cvp_cb_info *info)
 {
-	struct cvp_hfi_msg_session_hdr *pkt = _pkt;
 	struct msm_cvp_cb_cmd_done cmd_done = {0};
 	unsigned int pkt_size = get_msg_size();
 
@@ -370,10 +361,9 @@ static int hfi_process_session_rel_buf_done(u32 device_id,
 }
 
 static int hfi_process_session_cvp_operation_config(u32 device_id,
-	void *_pkt,
+	struct cvp_hfi_msg_session_op_cfg_packet *pkt,
 	struct msm_cvp_cb_info *info)
 {
-	struct cvp_hfi_msg_session_op_cfg_packet *pkt = _pkt;
 	struct msm_cvp_cb_cmd_done cmd_done = {0};
 	int signal;
 	unsigned int conf_id, session_id, error_type;
@@ -436,7 +426,7 @@ retry:
 			}
 		}
 
-		inst = match && kref_get_unless_zero(&inst->kref) ? inst : NULL;
+		inst = match ? inst : NULL;
 		mutex_unlock(&core->lock);
 	} else {
 		if (core->state == CVP_CORE_UNINIT)
@@ -453,41 +443,42 @@ retry:
 
 }
 
+
 static int __dme_output_cache_operation(struct cvp_hfi_msg_session_hdr *pkt)
 {
-	struct cvp_hfi_msg_dme_pkt *dme_pkt;
-	int rc;
+    struct cvp_hfi_msg_dme_pkt *dme_pkt;
+    int rc;
 
-	if (!pkt) {
-		dprintk(CVP_ERR, "%s: invalid param\n", __func__);
-		return -EINVAL;
-	} else if (pkt->size < get_msg_size()) {
-		dprintk(CVP_ERR, "%s: bad_pkt_size %d\n", __func__, pkt->size);
-		return -E2BIG;
-	}
+    if (!pkt) {
+        dprintk(CVP_ERR, "%s: invalid param\n", __func__);
+        return -EINVAL;
+    } else if (pkt->size < get_msg_size()) {
+        dprintk(CVP_ERR, "%s: bad_pkt_size %d\n", __func__, pkt->size);
+        return -E2BIG;
+    }
 
-	dme_pkt = (struct cvp_hfi_msg_dme_pkt *)pkt;
-	rc = dma_buf_begin_cpu_access_partial(dme_pkt->statsbuffer.dbuf,
-						DMA_TO_DEVICE, 0,
-						dme_pkt->statsbuffer.size);
-	if (rc) {
-		dprintk(CVP_ERR, "%s: begin_cpu_access failed\n", __func__);
-		return rc;
-	}
-	rc = dma_buf_end_cpu_access_partial(dme_pkt->statsbuffer.dbuf,
-						DMA_FROM_DEVICE, 0,
-						dme_pkt->statsbuffer.size);
-	if (rc)
-		dprintk(CVP_ERR, "%s: end_cpu_access failed\n", __func__);
+    dme_pkt = (struct cvp_hfi_msg_dme_pkt *)pkt;
+    rc = dma_buf_begin_cpu_access_partial(dme_pkt->statsbuffer.dbuf,
+                        DMA_TO_DEVICE, 0,
+                        dme_pkt->statsbuffer.size);
+    if (rc) {
+        dprintk(CVP_ERR, "%s: begin_cpu_access failed\n", __func__);
+        return rc;
+    }
+    rc = dma_buf_end_cpu_access_partial(dme_pkt->statsbuffer.dbuf,
+                        DMA_FROM_DEVICE, 0,
+                        dme_pkt->statsbuffer.size);
+    if (rc)
+        dprintk(CVP_ERR, "%s: end_cpu_access failed\n", __func__);
 
-	return rc;
+    return rc;
 }
 
+
 static int hfi_process_session_cvp_msg(u32 device_id,
-	void *_pkt,
+	struct cvp_hfi_msg_session_hdr *pkt,
 	struct msm_cvp_cb_info *info)
 {
-	struct cvp_hfi_msg_session_hdr *pkt = _pkt;
 	struct cvp_session_msg *sess_msg;
 	struct msm_cvp_inst *inst = NULL;
 	struct msm_cvp_core *core;
@@ -515,22 +506,18 @@ static int hfi_process_session_cvp_msg(u32 device_id,
 			|| pkt->packet_type == HFI_MSG_SESSION_CVP_FD) {
 			u64 ktid;
 			u32 kdata1, kdata2;
-			int rc;
 
 			kdata1 = pkt->client_data.kdata1;
 			kdata2 = pkt->client_data.kdata2;
 			ktid = ((u64)kdata2 << 32) | kdata1;
-
 
 			if (pkt->packet_type == HFI_MSG_SESSION_CVP_DME)
 				__dme_output_cache_operation(pkt);
 
 			msm_cvp_unmap_buf_cpu(inst, ktid);
 
-			rc = _deprecated_hfi_msg_process(device_id, pkt, info,
-							 inst);
-			cvp_put_inst(inst);
-			return rc;
+			return _deprecated_hfi_msg_process(device_id,
+				pkt, info, inst);
 		}
 		dprintk(CVP_ERR, "Invalid deprecate_bitmask %#x\n",
 					inst->deprecate_bitmask);
@@ -539,7 +526,7 @@ static int hfi_process_session_cvp_msg(u32 device_id,
 	sess_msg = kmem_cache_alloc(cvp_driver->msg_cache, GFP_KERNEL);
 	if (sess_msg == NULL) {
 		dprintk(CVP_ERR, "%s runs out msg cache memory\n", __func__);
-		goto error_no_mem;
+		return -ENOMEM;
 	}
 
 	memcpy(&sess_msg->pkt, pkt, get_msg_size());
@@ -562,22 +549,18 @@ static int hfi_process_session_cvp_msg(u32 device_id,
 
 	info->response_type = HAL_NO_RESP;
 
-	cvp_put_inst(inst);
 	return 0;
 
 error_handle_msg:
 	spin_unlock(&inst->session_queue.lock);
 	kmem_cache_free(cvp_driver->msg_cache, sess_msg);
-error_no_mem:
-	cvp_put_inst(inst);
 	return -ENOMEM;
 }
 
 static int hfi_process_session_cvp_dme(u32 device_id,
-	void *_pkt,
+	struct cvp_hfi_msg_session_hdr *pkt,
 	struct msm_cvp_cb_info *info)
 {
-	struct cvp_hfi_msg_session_hdr *pkt = _pkt;
 	struct msm_cvp_cb_cmd_done cmd_done = {0};
 
 	if (!pkt) {
@@ -603,10 +586,9 @@ static int hfi_process_session_cvp_dme(u32 device_id,
 }
 
 static int hfi_process_session_cvp_ica(u32 device_id,
-	void *_pkt,
+	struct cvp_hfi_msg_session_hdr *pkt,
 	struct msm_cvp_cb_info *info)
 {
-	struct cvp_hfi_msg_session_hdr *pkt = _pkt;
 	struct msm_cvp_cb_cmd_done cmd_done = {0};
 
 	if (!pkt) {
@@ -632,10 +614,9 @@ static int hfi_process_session_cvp_ica(u32 device_id,
 }
 
 static int hfi_process_session_cvp_fd(u32 device_id,
-	void *_pkt,
+	struct cvp_hfi_msg_session_hdr *pkt,
 	struct msm_cvp_cb_info *info)
 {
-	struct cvp_hfi_msg_session_hdr *pkt = _pkt;
 	struct msm_cvp_cb_cmd_done cmd_done = {0};
 
 	if (!pkt) {
@@ -731,10 +712,9 @@ static void hfi_process_sys_get_prop_image_version(
 }
 
 static int hfi_process_sys_property_info(u32 device_id,
-		void *_pkt,
+		struct cvp_hfi_msg_sys_property_info_packet *pkt,
 		struct msm_cvp_cb_info *info)
 {
-	struct cvp_hfi_msg_sys_property_info_packet *pkt = _pkt;
 	if (!pkt) {
 		dprintk(CVP_ERR, "%s: invalid param\n", __func__);
 		return -EINVAL;

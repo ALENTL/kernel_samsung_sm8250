@@ -44,6 +44,7 @@ static void dump_hfi_queue(struct iris_hfi_device *device)
 			dprintk(CVP_ERR, "HFI queue not init, fail to dump\n");
 			return;
 		}
+
 		dprintk(CVP_ERR, "queue details: %d %d\n",
 				queue->qhdr_read_idx, queue->qhdr_write_idx);
 		if (queue->qhdr_read_idx != queue->qhdr_write_idx) {
@@ -781,7 +782,7 @@ static void handle_operation_config(enum hal_command_response cmd, void *data)
 			__func__);
 }
 
-void cvp_handle_cmd_response(u32 cmd, void *data)
+void cvp_handle_cmd_response(enum hal_command_response cmd, void *data)
 {
 	dprintk(CVP_DBG, "Command response = %d\n", cmd);
 	switch (cmd) {
@@ -1749,8 +1750,7 @@ int cvp_comm_set_arp_buffers(struct msm_cvp_inst *inst)
 	return rc;
 
 error:
-	if (rc != -ENOMEM)
-		cvp_comm_release_persist_buffers(inst);
+	cvp_comm_release_persist_buffers(inst);
 	return rc;
 }
 
