@@ -37,7 +37,8 @@ jobs:
 
       - name: Download prebuilt Google clang
         run: |
-          wget -O clang-r547379.tar.gz https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/mirror-goog-main-llvm-toolchain-source/clang-r547379.tar.gz
+          wget --no-cookies --header "Cookie: gi=0" -O clang-r547379.tar.gz \
+            https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/mirror-goog-main-llvm-toolchain-source/clang-r547379.tar.gz
           mkdir clang-r547379; cd clang-r547379
           tar -xf ../clang-r547379.tar.gz
           rm ../clang-r547379.tar.gz
@@ -57,7 +58,7 @@ jobs:
           echo "**Kernel version:** $(cat out/include/config/kernel.release)  " >> version.txt
           echo >> version.txt
           export KHASH="$(git rev-parse HEAD)"
-          echo "**Kernel source:** [$KHASH](https://github.com/UN1CA/kernel_samsung_sm8250/tree/$KHASH)" >> version.txt
+          echo "**Kernel source:** [$KHASH](https://github.com/ALENTL/kernel_samsung_sm8250/tree/$KHASH)" >> version.txt
 
           if [ "${{ github.event.inputs.release }}" = "true" ] && \
              [ -n "${{ github.event.inputs.changelog }}" ]; then
