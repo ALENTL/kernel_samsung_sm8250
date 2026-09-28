@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0-only */
 /*
  * Copyright (c) 2008-2021, The Linux Foundation. All rights reserved.
- * Copyright (c) Qualcomm Technologies, Inc. and/or its subsidiaries.
+ * Copyright (c) 2023 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 #ifndef __KGSL_H
 #define __KGSL_H
@@ -316,7 +316,7 @@ typedef void (*kgsl_event_func)(struct kgsl_device *, struct kgsl_event_group *,
  * @priv: Private data passed to the callback function
  * @node: List node for the kgsl_event_group list
  * @created: Jiffies when the event was created
- * @work: kthread_work struct for dispatching the callback
+ * @work: Work struct for dispatching the callback
  * @result: KGSL event result type to pass to the callback
  * group: The event group this event belongs to
  */
@@ -328,7 +328,7 @@ struct kgsl_event {
 	void *priv;
 	struct list_head node;
 	unsigned int created;
-	struct kthread_work work;
+	struct work_struct work;
 	int result;
 	struct kgsl_event_group *group;
 };
@@ -431,20 +431,6 @@ long kgsl_ioctl_gpu_command(struct kgsl_device_private *dev_priv,
 				unsigned int cmd, void *data);
 long kgsl_ioctl_gpuobj_set_info(struct kgsl_device_private *dev_priv,
 				unsigned int cmd, void *data);
-long kgsl_ioctl_gpu_aux_command(struct kgsl_device_private *dev_priv,
-		unsigned int cmd, void *data);
-long kgsl_ioctl_timeline_create(struct kgsl_device_private *dev_priv,
-		unsigned int cmd, void *data);
-long kgsl_ioctl_timeline_wait(struct kgsl_device_private *dev_priv,
-		unsigned int cmd, void *data);
-long kgsl_ioctl_timeline_query(struct kgsl_device_private *dev_priv,
-		unsigned int cmd, void *data);
-long kgsl_ioctl_timeline_fence_get(struct kgsl_device_private *dev_priv,
-		unsigned int cmd, void *data);
-long kgsl_ioctl_timeline_signal(struct kgsl_device_private *dev_priv,
-		unsigned int cmd, void *data);
-long kgsl_ioctl_timeline_destroy(struct kgsl_device_private *dev_priv,
-		unsigned int cmd, void *data);
 
 long kgsl_ioctl_sparse_phys_alloc(struct kgsl_device_private *dev_priv,
 					unsigned int cmd, void *data);
@@ -489,8 +475,6 @@ void kgsl_mmu_remove_global(struct kgsl_device *device,
 		struct kgsl_memdesc *memdesc);
 
 /* Helper functions */
-unsigned long kgsl_get_align(struct kgsl_memdesc *memdesc);
-
 int kgsl_request_irq(struct platform_device *pdev, const  char *name,
 		irq_handler_t handler, void *data);
 

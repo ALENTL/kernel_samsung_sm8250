@@ -1,6 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * Copyright (c) 2010-2019, The Linux Foundation. All rights reserved.
  * Copyright (c) 2022 Qualcomm Innovation Center, Inc. All rights reserved.
  */
 
@@ -917,17 +916,6 @@ static int opp_notify(struct notifier_block *nb,
 		mutex_unlock(&device->mutex);
 	}
 
-	if (kgsl_pwr_limits_set_freq(pwr->cooling_pwr_limit,
-			pwr->pwrlevels[max_level].gpu_freq)) {
-		dev_err(device->dev,
-				"Failed to set cooling thermal limit via limits fw\n");
-		mutex_lock(&device->mutex);
-		pwr->thermal_pwrlevel = max_level;
-		/* Update the current level using the new limit */
-		kgsl_pwrctrl_pwrlevel_change(device, pwr->active_pwrlevel);
-		mutex_unlock(&device->mutex);
-	}
-
 	return 0;
 }
 
@@ -1039,13 +1027,6 @@ int kgsl_pwrscale_init(struct device *dev, const char *governor)
 	} else
 		data->bus.num = 0;
 
-	pwrscale->devfreq_wq = create_freezable_workqueue("kgsl_devfreq_wq");
-	if (!pwrscale->devfreq_wq) {
-		dev_err(device->dev, "Failed to allocate kgsl devfreq workqueue\n");
-		device->pwrscale.enabled = false;
-		return -ENOMEM;
-	}
-
 	devfreq = devfreq_add_device(dev, &pwrscale->gpu_profile.profile,
 			governor, pwrscale->gpu_profile.private_data);
 	if (IS_ERR(devfreq)) {
@@ -1092,6 +1073,7 @@ int kgsl_pwrscale_init(struct device *dev, const char *governor)
 	ret = sysfs_create_link(&device->dev->kobj,
 			&devfreq->dev.kobj, "devfreq");
 
+	pwrscale->devfreq_wq = create_freezable_workqueue("kgsl_devfreq_wq");
 	INIT_WORK(&pwrscale->devfreq_suspend_ws, do_devfreq_suspend);
 	INIT_WORK(&pwrscale->devfreq_resume_ws, do_devfreq_resume);
 	INIT_WORK(&pwrscale->devfreq_notify_ws, do_devfreq_notify);
@@ -1142,13 +1124,8 @@ void kgsl_pwrscale_close(struct kgsl_device *device)
 		devfreq_cooling_unregister(pwrscale->cooling_dev);
 
 	kgsl_pwrscale_midframe_timer_cancel(device);
-
-	if (pwrscale->devfreq_wq) {
-		flush_workqueue(pwrscale->devfreq_wq);
-		destroy_workqueue(pwrscale->devfreq_wq);
-		pwrscale->devfreq_wq = NULL;
-	}
-
+	flush_workqueue(pwrscale->devfreq_wq);
+	destroy_workqueue(pwrscale->devfreq_wq);
 	devfreq_remove_device(device->pwrscale.devfreqptr);
 	kfree(kgsl_midframe);
 	kgsl_midframe = NULL;
