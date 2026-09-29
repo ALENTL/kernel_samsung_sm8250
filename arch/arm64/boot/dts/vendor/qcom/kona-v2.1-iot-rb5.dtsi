@@ -25,6 +25,15 @@
 		power-source = <0>;
 		};
 	};
+
+	rb5_fan_controller_pin_init: rb5_fan_controller_pin_init {
+		pins = "gpio10";
+		function = "normal";
+		output-enable;
+		input-disable;
+		bias-pull-down;
+		power-source = <0>;
+	};
 };
 
 &mdss_mdp {
@@ -177,10 +186,28 @@
 };
 
 &soc {
+	msm_vidc: qcom,vidc@aa00000 {
+		compatible = "qcom,msm-vidc", "qcom,qcs8250-vidc";
+	};
+
 	clk40M: can_clock {
 		compatible = "fixed-clock";
 		#clock-cells = <0>;
 		clock-frequency = <40000000>;
+	};
+
+	rb5_fan_controller {
+		compatible = "qcom,rb5_fan_controller";
+		qcom,pwr-enable-gpio = <&pm8150l_gpios 10 0x0>;
+		pinctrl-name = "default";
+		pinctrl-0 = <&rb5_fan_controller_pin_init>;
+		status = "ok";
+	};
+
+	rb5_gpios_enable {
+		compatible = "qcom,rb5_gpios_enable";
+		qcom,enable-gpio = <&tlmm 60 0x0>;
+		status = "ok";
 	};
 };
 
@@ -194,6 +221,7 @@
 
 &pm8150b_charger {
 	qcom,batteryless-platform;
+	qcom,lpd-disable;
 };
 
 &qupv3_se0_spi {
@@ -212,7 +240,13 @@
 };
 
 &pcie1 {
-	status = "disabled";
+	status = "okay";
+	qcom,boot-option = <0x0>;
+};
+
+&pcie2 {
+	status = "okay";
+	qcom,boot-option = <0x0>;
 };
 
 &thermal_zones {
