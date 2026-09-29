@@ -7,3 +7,6 @@
 [submodule "NoMount"]
 	path = NoMount
 	url = https://github.com/maxsteeel/nomount.git
+[submodule "KernelSU"]
+	path = KernelSU
+	url = https://github.com/ALENTL/KernelSU.git
