@@ -46,6 +46,11 @@ jobs:
             zip \
             zstd
 
+      - name: Set up Swap Space
+        uses: pierotofy/set-swap-space@master
+        with:
+          swap-size-gb: 12
+
       - name: Set build information
         run: |
           echo "START_TIME=$(date +%s)" >> "$GITHUB_ENV"
