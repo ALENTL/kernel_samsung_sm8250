@@ -1,83 +1,169 @@
-name: Build kernel
+name: Build tl_kernel
 
 on:
   workflow_dispatch:
     inputs:
-      release:
-          description: 'Upload release'
-          type: boolean
-          required: true
-          default: false
       changelog:
-          description: 'Changelog'
-          type: string
-          required: false
+        description: "Changelog"
+        required: false
+        type: string
+
+permissions:
+  contents: write
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    steps:
-      # 1. Checkout repository with submodules (shallow clone)
-      - name: Checkout repository
-        uses: actions/checkout@v5
-        with:
-          submodules: true
-          fetch-depth: 1
 
-      - name: Install build tools
+    env:
+      DEVICE: r8q
+      KERNEL_NAME: tl_kernel
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          submodules: recursive
+
+      - name: Install dependencies
         run: |
+          sudo apt-get update
           sudo apt-get install -y \
+            bc \
+            bison \
             build-essential \
-            git \
             curl \
-            unzip \
-            wget \
+            flex \
+            gcc-aarch64-linux-gnu \
+            gcc-arm-linux-gnueabi \
+            git \
+            jq \
+            libelf-dev \
+            libssl-dev \
+            lz4 \
+            python3 \
             zip \
             zstd
 
-      - name: Download prebuilt Google clang
+      - name: Set build information
         run: |
-          wget --no-cookies --header "Cookie: gi=0" -O clang-r547379.tar.gz \
-            https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/mirror-goog-main-llvm-toolchain-source/clang-r547379.tar.gz
-          mkdir clang-r547379; cd clang-r547379
-          tar -xf ../clang-r547379.tar.gz
-          rm ../clang-r547379.tar.gz
-          cd ..
+          echo "START_TIME=$(date +%s)" >> "$GITHUB_ENV"
+          echo "BUILD_DATE=$(date +'%Y%m%d')" >> "$GITHUB_ENV"
+          echo "BUILD_DATE_HUMAN=$(date +'%d %B %Y')" >> "$GITHUB_ENV"
+          echo "COMMIT_HASH=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
 
-      # 2. Run your custom bash script
       - name: Build kernel
         run: |
           chmod +x build.sh
-          bash build.sh
+          ./build.sh
 
-      - name: Generate release version
-        id: ts
+      - name: Calculate build duration
+        if: always()
         run: |
-          echo "RELEASE_TS=$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_ENV
-          : > version.txt
-          echo "**Kernel version:** $(cat out/include/config/kernel.release)  " >> version.txt
-          echo >> version.txt
-          export KHASH="$(git rev-parse HEAD)"
-          echo "**Kernel source:** [$KHASH](https://github.com/UN1CA/kernel_samsung_sm8250/tree/$KHASH)" >> version.txt
+          END_TIME=$(date +%s)
+          DURATION=$((END_TIME - START_TIME))
 
-          if [ "${{ github.event.inputs.release }}" = "true" ] && \
-             [ -n "${{ github.event.inputs.changelog }}" ]; then
-            echo >> version.txt
-            echo "**Changelog:**" >> version.txt
-            echo >> version.txt
-            printf "%b\n" "${{ github.event.inputs.changelog }}" >> version.txt
+          MINUTES=$((DURATION / 60))
+          SECONDS_REMAINING=$((DURATION % 60))
+
+          echo "BUILD_DURATION=${MINUTES}m ${SECONDS_REMAINING}s" >> "$GITHUB_ENV"
+
+      - name: Verify AnyKernel3 ZIP
+        run: |
+          ZIP_FILE=$(find . -maxdepth 1 -type f -name "*.zip" | head -n1)
+
+          if [ -z "$ZIP_FILE" ]; then
+            echo "::error::No AnyKernel3 ZIP was generated"
+            exit 1
           fi
 
-      # 3. Upload the generated boot.img
-      - name: Upload release assets
-        if: github.event.inputs.release
-        uses: softprops/action-gh-release@v2.4.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.TOKEN }}
+          echo "Found: $ZIP_FILE"
+          echo "ZIP_FILE=$ZIP_FILE" >> "$GITHUB_ENV"
+
+      - name: Generate SHA256
+        run: |
+          sha256sum "$ZIP_FILE" | tee "${ZIP_FILE}.sha256"
+
+      - name: Collect build information
+        run: |
+          set -e
+
+          KERNEL_VERSION=$(cat out/include/config/kernel.release)
+          echo "KERNEL_VERSION=$KERNEL_VERSION" >> "$GITHUB_ENV"
+
+          CLANG_VERSION=$(
+            "$GITHUB_WORKSPACE/toolchains/neutron-clang/bin/clang" \
+              --version |
+              head -n1
+          )
+          echo "CLANG_VERSION=$CLANG_VERSION" >> "$GITHUB_ENV"
+
+          KSU_VERSION="Unknown"
+
+          if git -C KernelSU rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            git -C KernelSU fetch --tags --force
+            KSU_VERSION=$(git -C KernelSU describe --tags --always)
+          fi
+          
+          echo "KSU_VERSION=$KSU_VERSION" >> "$GITHUB_ENV"
+
+          SUSFS_VERSION="Unknown"
+
+          if [ -f "include/linux/susfs.h" ]; then
+            SUSFS_VERSION=$(
+              grep -m1 'SUSFS_VERSION' include/linux/susfs.h |
+              awk -F'"' '{print $2}' || true
+            )
+          fi
+
+          echo "SUSFS_VERSION=$SUSFS_VERSION" >> "$GITHUB_ENV"
+
+      - name: Prepare release information
+        run: |
+          echo "RELEASE_TAG=r8q-${BUILD_DATE}" >> "$GITHUB_ENV"
+          echo "RELEASE_NAME=tl_kernel ${KERNEL_VERSION} for Galaxy S20 FE" >> "$GITHUB_ENV"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
         with:
-          body_path: version.txt
-          tag_name: "${{ env.RELEASE_TS }}"
-          name: "UN1CA-r8q-${{ env.RELEASE_TS }}"
+          name: tl-kernel-r8q
+          path: |
+            ${{ env.ZIP_FILE }}
+            ${{ env.ZIP_FILE }}.sha256
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ env.RELEASE_TAG }}
+          name: ${{ env.RELEASE_NAME }}
+          generate_release_notes: false
+          body: |
+            ## tl_kernel
+
+            Kernel build for the Samsung Galaxy S20 FE 5G (r8q).
+
+            | Information | Value |
+            |---|---|
+            | Kernel | `${{ env.KERNEL_VERSION }}` |
+            | Device | Galaxy S20 FE 5G (r8q) |
+            | Kernel name | `tl_kernel` |
+            | Clang | `${{ env.CLANG_VERSION }}` |
+            | KernelSU | `${{ env.KSU_VERSION }}` |
+            | SusFS | `${{ env.SUSFS_VERSION }}` |
+            | Commit | `${{ env.COMMIT_HASH }}` |
+            | Build date | `${{ env.BUILD_DATE_HUMAN }}` |
+            | Build duration | `${{ env.BUILD_DURATION }}` |
+
+            ### Changelog
+
+            ${{ inputs.changelog }}
+
+            SHA256 checksum is included with the kernel ZIP.
+
           files: |
-            boot.img
-            dtbo.img
+            ${{ env.ZIP_FILE }}
+            ${{ env.ZIP_FILE }}.sha256
+
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
