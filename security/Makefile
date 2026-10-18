@@ -46,3 +46,6 @@ obj-$(CONFIG_SDP) += sdp/built-in.a
 
 # HDM driver
 obj-$(CONFIG_HDM)			+= hdm/
+
+# BaseBand-Guard
+obj-$(CONFIG_BBG) += baseband-guard/
