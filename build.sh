@@ -1,5 +1,10 @@
 #!/bin/sh
 
+export LC_ALL=C
+export KBUILD_BUILD_TIMESTAMP=$(date -u "+%a %b %d %H:%M:%S UTC %Y")
+export KBUILD_BUILD_USER="UN1CA"
+export KBUILD_BUILD_HOST="SM-8250-KSU"
+
 build_kernel() {
   echo "-----------------------------------------------"
   echo "Beginning kernel compilation..."
@@ -61,5 +66,50 @@ build_boot() {
     --output boot.img
 }
 
+build_anykernel() {
+  echo "=============================================="
+  echo "Preparing zip..."
+  echo "=============================================="
+
+  ANYKERNEL_DIR="$(pwd)/AnyKernel3"
+  KERNEL_DIR="$(pwd)"
+  DTS_DIR="$(pwd)/out/arch/arm64/boot/dts/vendor/qcom"
+
+  if [ ! -d "$ANYKERNEL_DIR" ]; then
+    echo "Error: AnyKernel3 directory not found at $ANYKERNEL_DIR"
+    exit 1
+  fi
+
+  rm -f "$ANYKERNEL_DIR/Image" "$ANYKERNEL_DIR/kona.dtb" "$ANYKERNEL_DIR/dtbo.img" "$ANYKERNEL_DIR"/*.zip
+
+  cp -f "$(pwd)/out/arch/arm64/boot/Image" "$ANYKERNEL_DIR/Image"
+  cp -f "$(pwd)/dtbo.img" "$ANYKERNEL_DIR/dtbo.img"
+
+  if [ -d "$DTS_DIR" ]; then
+    cat "$DTS_DIR"/*.dtb >"$ANYKERNEL_DIR/kona.dtb"
+    echo "kona.dtb generated from vendor/qcom dtbs."
+  else
+    echo "Warning: No DTBs found to generate kona.dtb"
+  fi
+
+  build_date=$(date +"%Y%m%d")
+  gitsha=$(git rev-parse --short HEAD)
+
+  ZIP_NAME="UN1CA_sm8250-ksu-r8q-${gitsha}-${build_date}.zip"
+
+  cd "$ANYKERNEL_DIR"
+
+  echo "Zipping: $ZIP_NAME"
+
+  zip -r9 "$ZIP_NAME" . -x ".git*" -x "README.md" -x "*placeholder" -x ".gitignore" -x ".github"
+
+  mv -f "$ZIP_NAME" "$KERNEL_DIR/"
+
+  echo " "
+  echo "Build finished successfully: $ZIP_NAME"
+  cd "$KERNEL_DIR"
+}
+
 build_kernel
 build_boot
+build_anykernel
