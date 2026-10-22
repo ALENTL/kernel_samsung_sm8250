@@ -37,11 +37,11 @@ jobs:
 
       - name: Download prebuilt Google clang
         run: |
-          wget --no-cookies --header "Cookie: gi=0" -O clang-r547379.tar.gz \
-            https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/mirror-goog-main-llvm-toolchain-source/clang-r547379.tar.gz
-          mkdir clang-r547379; cd clang-r547379
-          tar -xf ../clang-r547379.tar.gz
-          rm ../clang-r547379.tar.gz
+          wget --no-cookies --header "Cookie: gi=0" -O clang-r596125.tar.gz \
+            https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/mirror-goog-main-llvm-toolchain-source/clang-r596125.tar.gz
+          mkdir clang-r596125; cd clang-r596125
+          tar -xf ../clang-r596125.tar.gz
+          rm ../clang-r596125.tar.gz
           cd ..
 
       # 2. Run your custom bash script
